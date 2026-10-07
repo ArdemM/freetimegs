@@ -15,11 +15,35 @@ cd ~/masterarbeit/freetimegs     # Python nie in ~/masterarbeit selbst starten
 
 | Pfad | Inhalt |
 |---|---|
-| `scripts/` | Datenvorbereitung |
+| `train.py` | eigener FreeTimeGS-Trainer (Konfiguration: `python train.py --help`) |
+| `ftgs/` | Datensatz (`data.py`) und 4D-Repräsentation (`model.py`) |
+| `scripts/` | Datenvorbereitung, Lauf-Skripte |
 | `~/masterarbeit/data/n3dv/raw/<szene>/` | Original-Videos Neural3DV (`camXX.mp4`, `poses_bounds.npy`) |
 | `~/masterarbeit/data/n3dv/<szene>_<N>f/` | vorbereitete Szene (siehe unten) |
 | `~/masterarbeit/results/` | Trainingsläufe (TensorBoard, Checkpoints) |
 | `EXPERIMENTS.md` | Protokoll aller Läufe |
+
+## Training (eigener Trainer)
+
+```bash
+cd ~/masterarbeit/freetimegs
+bash scripts/run_proto.sh ~/masterarbeit/results/ftgs_proto_l1_kf1 \
+    --data-dir ~/masterarbeit/data/n3dv/flame_steak_50f --keyframe-step 1
+```
+
+`run_proto.sh` ruft `train.py` auf und schreibt zusätzlich `run_info.txt` (Commit, Argumente, Wanduhrzeit, VRAM-Spitze laut `nvidia-smi`) und `vram.csv`.
+Alle Bilder werden beim Start in den Hauptspeicher geladen (flame_steak, 50 Frames: 4 GB).
+Testkamera ist `cam00` (`--test-cams`), ausgewertet werden alle Frames. Ergebnisse im Lauf-Ordner:
+
+| Pfad | Inhalt |
+|---|---|
+| `stats/val_stepNNNNN.json` | Mittelwerte und PSNR/SSIM/LPIPS pro Frame |
+| `stats/train_stepNNNNN.json` | Trainingszeit (ohne Evaluation), `torch`-Speicherspitze, Anzahl Gaußsche |
+| `videos/test_cam00_stepN.mp4` | links GT, rechts Rendering, alle Frames |
+| `videos/traj_stepN.mp4` | Kamerafahrt durch die Trainingskameras, Zeit läuft mit |
+| `ckpts/ckpt_final.pt` | Parameter; nur auswerten mit `python train.py --ckpt <pfad> --result-dir <ordner>` |
+
+Stand Schritt 4 (Machbarkeitsplan): feste Anzahl Gaußscher, Init aus den Punktwolken jedes `keyframe_step`-ten Frames (μₜ = Zeit des Frames, v = 0, s = 2 × Keyframe-Abstand), keine Relokation, keine 4D-Regularisierung.
 
 ## Neural3DV vorbereiten
 
