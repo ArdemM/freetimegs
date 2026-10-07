@@ -44,13 +44,24 @@ flame_steak_50f/
   images/cam00/00000.png ... 00049.png   1352x1014, je Kamera ein Ordner
   sparse/0/                              COLMAP-Modell von Frame 0 (PINHOLE, Bildnamen camXX.png)
   frame0/                                nur Frame 0, direkt mit gsplat simple_trainer.py nutzbar
-  colmap/                                Datenbank, Log, Eingabebilder
+  colmap/                                Datenbank, Log, Eingabebilder; frames/NNNNN/sparse pro Frame
+  points/                                Punktwolken pro Frame (triangulate_frames.py)
   poses_bounds.npy                       Original-LLFF-Posen (nur zum Vergleich)
   meta.json
 ```
 
 Das Layout entspricht dem „flat“-Format, das auch FreeTimeGsVanilla liest (`--data-dir`, `--data-factor 1`).
 `cam00` ist die Testkamera.
+
+Punktwolke pro Frame (feste Posen aus `sparse/0`, SIFT + `colmap point_triangulator`, ca. 4 s pro Frame):
+
+```bash
+python scripts/triangulate_frames.py --scene ~/masterarbeit/data/n3dv/flame_steak_50f \
+    --workers 8 --two-view-tracks
+```
+
+Das Ergebnis liegt in `points/points3d_frame000000.npy` und `points/colors_frame000000.npy` (`[M,3]` float32, Farben 0–255), wie FreeTimeGsVanilla es erwartet. Kennzahlen pro Frame stehen in `points/stats.json`.
+Bei flame_steak sind es ca. 6700 Punkte pro Frame mit 0,55 px Reprojektionsfehler. `--two-view-tracks` behält auch Punkte, die nur zwei Kameras sehen, und verdoppelt damit etwa die Punktzahl.
 
 Plausibilitätstest (statisch, Frame 0):
 
