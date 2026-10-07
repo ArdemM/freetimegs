@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+
+# data and training output live outside the repo (~/masterarbeit/data, ~/masterarbeit/results)
+data/
+results/
+runs/
+*.ply
+*.pt
+*.ckpt
+*.npz
+*.mp4
