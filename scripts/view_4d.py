@@ -8,14 +8,6 @@ deren Polen. Im Trainings-Weltsystem ist die Szene gekippt, deshalb wird die
 Oben-Achse auf die mittlere Oben-Richtung der Kameras gesetzt und der Viewer
 startet aus einer Trainingskamera (Auswahl unter "Kamera").
 
-Filter (unter "Filter", standardmäßig aus, damit das Bild der Evaluation entspricht):
-- "Unsichtbare entfernen": Gaußsche, die über alle Frames und Trainingskameras
-  zusammen weniger als --min-contrib Pixel zum Bild beitragen (Floater hinter Wand
-  und Rollo, die nur aus neuen Blickwinkeln auftauchen). Die Trainingsansichten
-  bleiben dabei praktisch unverändert.
-- "Kugel": nur Gaußsche innerhalb eines Radius um den Szenenmittelpunkt. Wirkt
-  aufgeräumter, schneidet aber auch Hintergrund ab, der in den Kamerabildern liegt.
-
 Aufruf (in WSL, danach im Windows-Browser http://localhost:8080 öffnen):
     python scripts/view_4d.py --ckpt ~/masterarbeit/results/ablation/kf1_full/ckpts/ckpt_final.pt
 """
@@ -47,8 +39,6 @@ def main() -> None:
     ap.add_argument("--num-frames", type=int, default=None, help="Standard: aus data_dir des Checkpoints")
     ap.add_argument("--min-temporal", type=float, default=1e-3, help="σ(t)-Schwelle wie beim Rendern")
     ap.add_argument("--start-cam", default="cam00")
-    ap.add_argument("--min-contrib", type=float, default=1.0,
-                    help="Filter 'Unsichtbare entfernen': minimaler Beitrag in Pixeln")
     args = ap.parse_args()
 
     device = "cuda"
@@ -79,33 +69,6 @@ def main() -> None:
     server.scene.set_up_direction(up)
 
     state = {"frame": 0, "playing": False, "fps": 30.0, "mode": MODES[0], "active": 0}
-    all_splats, N = splats, len(splats["means"])
-    dist = all_splats["means"].norm(dim=-1)  # Abstand zum Szenenmittelpunkt (Ursprung)
-    contrib = None  # Beitrag pro Gaußscher, erst bei Bedarf berechnet
-
-    def compute_contrib() -> torch.Tensor:
-        """Summe der Blending-Gewichte pro Gaußscher über alle Frames und Kameras.
-
-        Der Gradient der Bildsumme nach einer konstanten Farbe 1 ist genau das
-        Gewicht T·α, mit dem die Gaußsche in die Pixel eingeht (in Pixeln).
-        """
-        out = torch.zeros(N, device=device)
-        vms = torch.linalg.inv(torch.from_numpy(c2ws).float().to(device))
-        Kt = torch.from_numpy(np.stack(Ks)).float().to(device)
-        for f in range(F):
-            g, mask = gaussians_at(all_splats, f / max(F - 1, 1), args.min_temporal)
-            idx = mask.nonzero().squeeze(1)
-            for c in range(len(cam_names)):
-                W, H = sizes[c]
-                col = torch.ones(len(idx), 3, device=device, requires_grad=True)
-                img, _, _ = rasterization(
-                    means=g["means"], quats=g["quats"], scales=g["scales"], opacities=g["opacities"],
-                    colors=col, viewmats=vms[c : c + 1], Ks=Kt[c : c + 1], width=W, height=H,
-                    sh_degree=None, near_plane=near, far_plane=far,
-                )
-                img[..., 0].sum().backward()
-                out.index_add_(0, idx, col.grad[:, 0])
-        return out
 
     def set_camera(client: viser.ClientHandle, name: str) -> None:
         i = cam_names.index(name)
@@ -130,37 +93,10 @@ def main() -> None:
     with server.gui.add_folder("Darstellung"):
         mode_dd = server.gui.add_dropdown("Modus", MODES, initial_value=MODES[0])
         stats_md = server.gui.add_markdown("")
-    with server.gui.add_folder("Filter"):
-        invis_cb = server.gui.add_checkbox("Unsichtbare entfernen", initial_value=False,
-                                           hint=f"Beitrag < {args.min_contrib} px zu allen Trainingsbildern")
-        sphere_cb = server.gui.add_checkbox("Kugel", initial_value=False)
-        r_max = float(torch.quantile(dist, 0.999))
-        radius_sl = server.gui.add_slider("Radius", min=0.5, max=round(r_max, 1), step=0.1,
-                                          initial_value=round(r_max, 1),
-                                          hint="Kameras stehen bei ca. 4–5, der Hintergrund liegt teils dahinter")
-        filter_md = server.gui.add_markdown("Filter aus")
-
-    def apply_filter() -> None:
-        nonlocal splats, contrib
-        keep = torch.ones(N, dtype=torch.bool, device=device)
-        if invis_cb.value:
-            if contrib is None:
-                filter_md.content = "berechne Beiträge (ca. 10 s) ..."
-                contrib = compute_contrib()
-            keep &= contrib >= args.min_contrib
-        if sphere_cb.value:
-            keep &= dist <= radius_sl.value
-        splats = all_splats if bool(keep.all()) else {k: v[keep] for k, v in all_splats.items()}
-        n_out = N - int(keep.sum())
-        filter_md.content = f"entfernt: {n_out:,} ({100 * n_out / N:.1f} %)" if n_out else "Filter aus"
-        viewer.rerender(None)
-
-    for handle in (invis_cb, sphere_cb, radius_sl):
-        handle.on_update(lambda _: apply_filter())
 
     def update_stats() -> None:
         t = state["frame"] / max(F - 1, 1)
-        stats_md.content = f"t = {t:.3f}  \naktiv: {state['active']:,} / {N:,}"
+        stats_md.content = f"t = {t:.3f}  \naktiv: {state['active']:,} / {len(splats['means']):,}"
 
     @frame_slider.on_update
     def _(_) -> None:
