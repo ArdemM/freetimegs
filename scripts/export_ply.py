@@ -24,7 +24,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ftgs.model import temporal_opacity  # noqa: E402
+from ma4dgs.model import temporal_opacity  # noqa: E402
 from gsplat import export_splats  # noqa: E402
 
 
@@ -122,7 +122,7 @@ def main() -> None:
     # Ausrichtung: mittlere Kamera-Oben-Richtung (−y der Kameras, OpenCV) auf die Zielachse
     R = np.eye(3)
     if args.up != "none":
-        from datasets.colmap import Parser  # noqa: E402  (Pfad setzt ftgs.data)
+        from datasets.colmap import Parser  # noqa: E402  (Pfad setzt ma4dgs.data)
 
         # nur Posen lesen, keine Bilder laden
         p = Parser(str(Path(cfg["data_dir"]).expanduser() / "frame0"), factor=1, normalize=True,

@@ -9,7 +9,7 @@
 # Feste Anzahl Gaußscher (keine Densifizierung). Die FreeTimeGS-Bausteine aus
 # Schritt 5 sind einzeln schaltbar und standardmäßig aus (= Prototyp aus Schritt 4):
 #   --lambda-reg 1e-2            4D-Regularisierung (Gl. 6)
-#   --relocate                   periodische Relokation (Gl. 7, ftgs/relocation.py)
+#   --relocate                   periodische Relokation (Gl. 7, ma4dgs/relocation.py)
 #   --init-velocity knn          k-NN-Geschwindigkeit zwischen Keyframes
 #   --velocities-lr-final 5e-5   Velocity-Annealing
 #
@@ -37,9 +37,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
-from ftgs.data import MultiViewVideo
-from ftgs.model import gaussians_at, init_from_frames, knn_velocities, temporal_opacity
-from ftgs.relocation import Relocator
+from ma4dgs.data import MultiViewVideo
+from ma4dgs.model import gaussians_at, init_from_frames, knn_velocities, temporal_opacity
+from ma4dgs.relocation import Relocator
 from datasets.traj import focus_point_fn, viewmatrix  # gsplat/examples
 from gsplat.losses import l1_loss, ssim_loss
 from gsplat.rendering import rasterization

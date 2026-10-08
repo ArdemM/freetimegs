@@ -1,14 +1,21 @@
 # ma4dgs
 
-Eigene FreeTimeGS-Implementierung (4D Gaussian Splatting) auf Basis von [gsplat](https://github.com/nerfstudio-project/gsplat) 1.6.0, Masterarbeit.
+4D Gaussian Splatting für dynamische Multi-View-Szenen, Masterarbeit. Eigene Implementierung der Methode aus dem Paper *FreeTimeGS* auf Basis von [gsplat](https://github.com/nerfstudio-project/gsplat) 1.6.0.
 
 gsplat bleibt unverändert als Bibliothek in `~/masterarbeit/gsplat`; eigener Code liegt nur hier.
+
+## Hinweise zur Herkunft
+
+- **Inoffiziell und unabhängig.** Dieses Repository ist **nicht** der Code von FreeTimeGS und steht in keiner Verbindung zu dessen Autoren. Umgesetzt ist die im Paper beschriebene Methode: Y. Wang et al., *FreeTimeGS: Free Gaussian Primitives at Anytime and Anywhere for Dynamic Scene Reconstruction*, CVPR 2025 ([Projektseite](https://zju3dv.github.io/freetimegs/)). Offizieller Code ist nicht veröffentlicht. Ergebnisse dieses Repositorys sind keine Ergebnisse der Autoren.
+- **gsplat (Apache-2.0).** `train.py` ist an `gsplat/examples/simple_trainer.py` angelehnt, der Lizenzhinweis steht im Dateikopf. Datensatz-Parser und Rasterisierer werden unverändert aus gsplat importiert.
+- **FreeTimeGsVanilla (AGPL-3.0)** wurde nur als Referenz ausgeführt und gelesen (`scripts/run_vanilla_ref.sh`). Es wurde kein Code daraus übernommen.
+- **KI-Unterstützung.** Code und Dokumentation sind mit Unterstützung von KI entstanden (Claude Code, Anthropic). Commits mit KI-Beteiligung tragen die Zeile `Co-Authored-By: Claude`.
 
 ## Umgebung
 
 ```bash
 source ~/masterarbeit/.venv/bin/activate
-cd ~/masterarbeit/freetimegs     # Python nie in ~/masterarbeit selbst starten
+cd ~/masterarbeit/ma4dgs     # Python nie in ~/masterarbeit selbst starten
 ```
 
 ## Verzeichnisse
@@ -16,7 +23,7 @@ cd ~/masterarbeit/freetimegs     # Python nie in ~/masterarbeit selbst starten
 | Pfad | Inhalt |
 |---|---|
 | `train.py` | eigener FreeTimeGS-Trainer (Konfiguration: `python train.py --help`) |
-| `ftgs/` | Datensatz (`data.py`) und 4D-Repräsentation (`model.py`) |
+| `ma4dgs/` | Datensatz (`data.py`) und 4D-Repräsentation (`model.py`) |
 | `scripts/` | Datenvorbereitung, Lauf-Skripte |
 | `~/masterarbeit/data/n3dv/raw/<szene>/` | Original-Videos Neural3DV (`camXX.mp4`, `poses_bounds.npy`) |
 | `~/masterarbeit/data/n3dv/<szene>_<N>f/` | vorbereitete Szene (siehe unten) |
@@ -26,7 +33,7 @@ cd ~/masterarbeit/freetimegs     # Python nie in ~/masterarbeit selbst starten
 ## Training (eigener Trainer)
 
 ```bash
-cd ~/masterarbeit/freetimegs
+cd ~/masterarbeit/ma4dgs
 bash scripts/run_proto.sh ~/masterarbeit/results/ftgs_proto_l1_kf1 \
     --data-dir ~/masterarbeit/data/n3dv/flame_steak_50f --keyframe-step 1
 ```
@@ -54,7 +61,7 @@ curl -L -O https://github.com/facebookresearch/Neural_3D_Video/releases/download
 unzip flame_steak.zip
 
 # Frames extrahieren (halbe Auflösung) + COLMAP auf Frame 0
-cd ~/masterarbeit/freetimegs
+cd ~/masterarbeit/ma4dgs
 python scripts/prepare_n3dv.py \
     --src ~/masterarbeit/data/n3dv/raw/flame_steak \
     --out ~/masterarbeit/data/n3dv/flame_steak_50f \
@@ -116,7 +123,7 @@ uv pip install --no-build-isolation -r /tmp/req2.txt                         # c
 Lauf (Combiner, dann Training mit cam00 als einziger Testkamera, Auswertung aller Frames, VRAM-Protokoll):
 
 ```bash
-cd ~/masterarbeit/freetimegs
+cd ~/masterarbeit/ma4dgs
 bash scripts/run_vanilla_ref.sh ~/masterarbeit/data/n3dv/flame_steak_50f \
     ~/masterarbeit/results/vanilla_flame_steak_50f_kf5 30000 5
 ```

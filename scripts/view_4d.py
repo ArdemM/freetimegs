@@ -1,6 +1,6 @@
 """Interaktiver 4D-Viewer für Checkpoints des eigenen Trainers (viser + nerfview).
 
-Gerendert wird mit derselben Funktion wie im Training (ftgs.model.gaussians_at),
+Gerendert wird mit derselben Funktion wie im Training (ma4dgs.model.gaussians_at),
 das Bild im Viewer entspricht also dem, was bei der Evaluation herauskommt.
 
 Kamerasteuerung: viser dreht die Kamera um eine feste Oben-Achse und stoppt an
@@ -24,8 +24,8 @@ import viser
 import viser.transforms as vt
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ftgs.data import Parser  # noqa: E402  (setzt auch den Pfad zu gsplat/examples)
-from ftgs.model import gaussians_at  # noqa: E402
+from ma4dgs.data import Parser  # noqa: E402  (setzt auch den Pfad zu gsplat/examples)
+from ma4dgs.model import gaussians_at  # noqa: E402
 from gsplat.rendering import rasterization  # noqa: E402
 from nerfview import CameraState, RenderTabState, Viewer, apply_float_colormap  # noqa: E402
 
