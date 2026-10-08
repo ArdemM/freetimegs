@@ -6,9 +6,30 @@ gsplat bleibt unverändert als Bibliothek in `~/masterarbeit/gsplat`; eigener Co
 
 ## Hinweise zur Herkunft
 
-- **gsplat (Apache-2.0).** `train.py` ist an `gsplat/examples/simple_trainer.py` angelehnt, der Lizenzhinweis steht im Dateikopf. Datensatz-Parser und Rasterisierer werden unverändert aus gsplat importiert.
-- **FreeTimeGsVanilla (AGPL-3.0)** wurde nur als Referenz ausgeführt und gelesen (`scripts/run_vanilla_ref.sh`). Es wurde kein Code daraus übernommen.
-- **KI-Unterstützung.** Code und Dokumentation sind mit Unterstützung von KI entstanden (Claude Code, Anthropic). Commits mit KI-Beteiligung tragen die Zeile `Co-Authored-By: Claude`.
+Alles, was von anderen stammt und hier verwendet wird:
+
+**Methoden (Paper)**
+- **FreeTimeGS**: Y. Wang et al., *FreeTimeGS: Free Gaussian Primitives at Anytime and Anywhere for Dynamic Scene Reconstruction*, CVPR 2025 ([Projektseite](https://zju3dv.github.io/freetimegs/)). Umgesetzt sind die dort beschriebene 4D-Repräsentation, die Losses, die 4D-Regularisierung und die Relokation (`ma4dgs/`, `train.py`).
+- **FreeTimeGS++** (2026): Zeitplan und Schwelle der Relokation sowie die Vererbung der Parameter (`train.py`, `ma4dgs/relocation.py`).
+- **3D Gaussian Splatting**: B. Kerbl et al., SIGGRAPH 2023. Grundrepräsentation, Lernraten, PLY-Format.
+- **3D Gaussian Splatting as Markov Chain Monte Carlo**: S. Kheradmand et al., NeurIPS 2024. Prinzip, „tote“ Gaußsche zu verschieben und Opazität und Größe aufzuteilen (`ma4dgs/relocation.py`).
+
+**Code**
+- **gsplat (Apache-2.0)**, [nerfstudio-project/gsplat](https://github.com/nerfstudio-project/gsplat) 1.6.0:
+  - `train.py` ist an `gsplat/examples/simple_trainer.py` angelehnt, der Lizenzhinweis steht im Dateikopf.
+  - `ma4dgs/relocation.py` ist an `gsplat/strategy/ops.py` (`relocate`) angelehnt.
+  - Rasterisierer, SH-Auswertung und PLY-Export werden aus `gsplat` importiert, COLMAP-Parser und Hilfsfunktionen (`knn`, `rgb_to_sh`, `set_random_seed`) unverändert aus `gsplat/examples` (`datasets/`, `utils.py`).
+- **FreeTimeGsVanilla (AGPL-3.0)**, [OpsiClear-4DGS/FreeTimeGsVanilla](https://github.com/OpsiClear-4DGS/FreeTimeGsVanilla): nur als Referenz ausgeführt und gelesen (`scripts/run_vanilla_ref.sh`), kein Code übernommen. Das Datenlayout (`images/camXX/`, `points/`) folgt seinem Format, damit beide dieselben Daten lesen.
+
+**Werkzeuge und Bibliotheken**
+- COLMAP (Kameraposen, Triangulation), ffmpeg (Frames aus Videos)
+- PyTorch, torchmetrics (PSNR, SSIM, LPIPS mit den Netzgewichten von R. Zhang et al., CVPR 2018), viser und nerfview (Viewer), tyro, OpenCV, imageio, scikit-learn, pycolmap, NumPy, PyYAML, tqdm
+
+**Daten**
+- **Neural3DV / DyNeRF**: T. Li et al., *Neural 3D Video Synthesis from Multi-view Video*, CVPR 2022 (Meta). Szene `flame_steak`.
+
+**KI-Unterstützung**
+- Code und Dokumentation sind mit Unterstützung von KI entstanden (Claude Code, Anthropic). Commits mit KI-Beteiligung tragen die Zeile `Co-Authored-By: Claude`.
 
 ## Umgebung
 
