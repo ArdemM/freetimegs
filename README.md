@@ -1,4 +1,4 @@
-# freetimegs
+# ma4dgs
 
 Eigene FreeTimeGS-Implementierung (4D Gaussian Splatting) auf Basis von [gsplat](https://github.com/nerfstudio-project/gsplat) 1.6.0, Masterarbeit.
 
