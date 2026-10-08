@@ -11,3 +11,15 @@ Ein Eintrag pro Lauf. Commit = `git rev-parse --short HEAD` zum Zeitpunkt des La
 | 2026-10-07 | 963904d | flame_steak 50f, Test cam00 (50 Frames) | eigener Prototyp, L2 statt L1, sonst wie oben | 30000 | 32.48 | 0.957 | 0.094 | 9 min | 1.2 GB | 7k: 32.26 |
 | 2026-10-07 | 963904d | flame_steak 50f, Test cam00 (50 Frames) | eigener Prototyp, L1, keyframe_step 5 (66.807, fix), s = 0.204 | 30000 | 30.13 | 0.952 | 0.114 | 7 min | 0.9 GB | 7k: 31.04 → PSNR sinkt im weiteren Training (Überanpassung an Trainingsansichten?) |
 | 2026-10-07 | 963904d | flame_steak 50f, Test cam00 (50 Frames) | eigener Prototyp, L1, keyframe_step 1, v = 0 fest (`--no-learn-velocity`) | 30000 | 33.24 | 0.957 | 0.089 | 9 min | 1.4 GB | bester Lauf. Gelernte v ohne Regularisierung/Annealing schadet hier (−1 dB) |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | Schritt 5, kf 5, + 4D-Reg (λ 1e-2 bis 15k) | 30000 | 30.62 | 0.946 | 0.117 | 7 min | 1.2 GB | 7k: 31.94, Abfall bleibt |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, + Reg + Relokation | 30000 | 32.34 | 0.953 | 0.105 | 9 min | 1.1 GB | 7k: 31.45, kein Abfall mehr |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, + Reg + Reloc + kNN-v | 30000 | 33.03 | 0.953 | 0.106 | 9 min | 1.3 GB | |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, volles Modell (+ Annealing 5e-3→5e-5) | 30000 | 33.67 | 0.964 | 0.078 | 9 min | 1.3 GB | Seed 42 |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, volles Modell, Seed 1 | 30000 | 33.97 | 0.965 | 0.078 | 9 min | 1.8 GB | |
+| 2026-10-08 | ba027da | flame_steak 50f, Test cam00 (50 Frames) | kf 5, volles Modell, Seed 2 | 30000 | 33.27 | 0.963 | 0.084 | 9 min | 1.7 GB | ba027da ändert nur die Kamerafahrt |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, voll ohne Reg | 30000 | 33.93 | 0.963 | 0.083 | 8 min | 1.4 GB | |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, voll ohne Relokation | 30000 | 33.88 | 0.959 | 0.095 | 7 min | 1.1 GB | |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, voll ohne kNN-v (v = 0 Start) | 30000 | 29.31 | 0.961 | 0.083 | 9 min | 1.1 GB | 7k: 30.73, Ausreißer? mit weiteren Seeds prüfen |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, Basis (Schritt 4), Seed 1 | 30000 | 31.13 | 0.952 | 0.109 | 8 min | 1.3 GB | |
+| 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, Basis (Schritt 4), Seed 2 | 30000 | 29.75 | 0.950 | 0.113 | 8 min | 1.8 GB | |
+| 2026-10-08 | ba027da | flame_steak 50f, Test cam00 (50 Frames) | kf 1, volles Modell | 30000 | 34.04 | 0.966 | 0.075 | 12 min | 1.6 GB | bester Lauf. Ø 221k von 334.500 Gaußschen sichtbar |
