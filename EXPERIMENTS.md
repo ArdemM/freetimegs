@@ -23,3 +23,6 @@ Ein Eintrag pro Lauf. Commit = `git rev-parse --short HEAD` zum Zeitpunkt des La
 | 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, Basis (Schritt 4), Seed 1 | 30000 | 31.13 | 0.952 | 0.109 | 8 min | 1.3 GB | |
 | 2026-10-08 | 934f733 | flame_steak 50f, Test cam00 (50 Frames) | kf 5, Basis (Schritt 4), Seed 2 | 30000 | 29.75 | 0.950 | 0.113 | 8 min | 1.8 GB | |
 | 2026-10-08 | ba027da | flame_steak 50f, Test cam00 (50 Frames) | kf 1, volles Modell | 30000 | 34.04 | 0.966 | 0.075 | 12 min | 1.6 GB | bester Lauf. Ø 221k von 334.500 Gaußschen sichtbar |
+| 2026-10-08 | 1920016 | flame_steak 50f, Test cam00 + cam15 (je 50 Frames), Training 19 Kameras | volles Modell, kf 1 | 30000 | 33.37 | 0.961 | 0.074 | 12 min | – | cam00 34.05/0.965/0.076, cam15 32.68/0.956/0.072. VRAM nicht verwertbar (parallele GPU-Jobs) |
+| 2026-10-08 | a17e9c5 | flame_steak 50f, Test cam00 + cam15 (je 50 Frames), Training 19 Kameras | volles Modell, kf 5 | 30000 | 32.98 | 0.960 | 0.078 | 12 min | – | cam00 33.38/0.964/0.079, cam15 32.57/0.955/0.076 |
+| 2026-10-08 | 8ff26c9 | flame_steak 50f, Test cam00 + cam15 (je 50 Frames), Training 19 Kameras | Schritt 4, kf 1, v = 0 fest (zeigt Ghosting in Kamerafahrt) | 30000 | 32.44 | 0.956 | 0.091 | 10 min | – | cam00 32.46/0.960/0.091, cam15 32.41/0.951/0.091: cam15 erkennt das Ghosting NICHT |
