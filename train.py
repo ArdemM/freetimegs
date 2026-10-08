@@ -6,9 +6,12 @@
 #   California, Nerfstudio Team and contributors. All rights reserved.
 #   SPDX-License-Identifier: Apache-2.0
 #
-# Stand Schritt 4: feste Anzahl Gaußscher (keine Densifizierung/Relokation),
-# keine 4D-Regularisierung, Geschwindigkeit mit 0 initialisiert, konstante
-# Lernraten für μₜ, s und v. Die FreeTimeGS-Bausteine folgen einzeln in Schritt 5.
+# Feste Anzahl Gaußscher (keine Densifizierung). Die FreeTimeGS-Bausteine aus
+# Schritt 5 sind einzeln schaltbar und standardmäßig aus (= Prototyp aus Schritt 4):
+#   --lambda-reg 1e-2            4D-Regularisierung (Gl. 6)
+#   --relocate                   periodische Relokation (Gl. 7, ftgs/relocation.py)
+#   --init-velocity knn          k-NN-Geschwindigkeit zwischen Keyframes
+#   --velocities-lr-final 5e-5   Velocity-Annealing
 #
 # Aufruf:
 #   python train.py --data-dir ~/masterarbeit/data/n3dv/flame_steak_50f \
@@ -35,7 +38,8 @@ from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMe
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
 from ftgs.data import MultiViewVideo
-from ftgs.model import gaussians_at, init_from_frames
+from ftgs.model import gaussians_at, init_from_frames, knn_velocities, temporal_opacity
+from ftgs.relocation import Relocator
 from datasets.traj import generate_interpolated_path  # gsplat/examples
 from gsplat.losses import l1_loss, ssim_loss
 from gsplat.rendering import rasterization
@@ -77,8 +81,28 @@ class Config:
     times_lr: float = 1e-3
     durations_lr: float = 5e-3
     velocities_lr: float = 5e-3
+    # Velocity-Annealing (Abschnitt 3.2): lr(p) = lr₀^(1−p) · lr₁^p, p = step / max_steps.
+    # None = konstant velocities_lr. Endwert nennt das Paper nicht.
+    velocities_lr_final: Optional[float] = None
     # Geschwindigkeit optimieren (False = statische Gaußsche, nur zeitlich begrenzt)
     learn_velocity: bool = True
+    # Anfangsgeschwindigkeit: 0 oder k-NN-Zuordnung zum nächsten Keyframe
+    init_velocity: Literal["zero", "knn"] = "zero"
+    knn_k: int = 3
+
+    # 4D-Regularisierung (Gl. 6): λ_reg · mean(σ · sg[σ(t)]), nur bis reg_until
+    # ("frühe Trainingsphase", Länge im Paper nicht angegeben)
+    lambda_reg: float = 0.0
+    reg_until: int = 15_000
+
+    # Periodische Relokation (Gl. 7), Zeitplan wie in FreeTimeGS++ (Suppl. A)
+    relocate: bool = False
+    reloc_every: int = 100
+    reloc_start: int = 500
+    reloc_stop: int = 25_000
+    reloc_min_opacity: float = 5e-3
+    reloc_lambda_grad: float = 0.5
+    reloc_lambda_opa: float = 0.5
 
     # Rendering-Loss (Gl. 5): λ_img·L_img + λ_ssim·(1 − SSIM) + λ_perc·LPIPS
     img_loss: Literal["l1", "l2"] = "l1"
@@ -131,6 +155,7 @@ class Runner:
             init_opacity=cfg.init_opacity,
             init_scale=cfg.init_scale,
             sh_degree=cfg.sh_degree,
+            velocities=knn_velocities(frames, cfg.knn_k) if cfg.init_velocity == "knn" else None,
         )
         self.splats = torch.nn.ParameterDict(
             {k: torch.nn.Parameter(v) for k, v in init.items()}
@@ -138,7 +163,19 @@ class Runner:
         self.splats["velocities"].requires_grad_(cfg.learn_velocity)
         print(
             f"Init: {len(keyframes)} Keyframes, {len(self.splats['means'])} Gaußsche, "
-            f"Dauer s = {self.init_duration:.4f}"
+            f"Dauer s = {self.init_duration:.4f}, "
+            f"|v| Median {self.splats['velocities'].norm(dim=-1).median().item():.4f}"
+        )
+        self.relocator = (
+            Relocator(
+                len(self.splats["means"]),
+                self.device,
+                lambda_grad=cfg.reloc_lambda_grad,
+                lambda_opa=cfg.reloc_lambda_opa,
+                min_opacity=cfg.reloc_min_opacity,
+            )
+            if cfg.relocate
+            else None
         )
 
         lrs = {
@@ -217,9 +254,16 @@ class Runner:
             pixels = self.data.images[cam, frame].to(self.device, non_blocking=True)
             pixels = pixels.float()[None] / 255.0  # [1, H, W, 3]
 
+            if cfg.velocities_lr_final is not None and "velocities" in self.optimizers:
+                p = step / max_steps
+                lr = cfg.velocities_lr ** (1 - p) * cfg.velocities_lr_final**p
+                self.optimizers["velocities"].param_groups[0]["lr"] = lr
+
             sh_degree = min(step // cfg.sh_degree_interval, cfg.sh_degree)
-            colors, _, _, mask = self.render(cam, t, sh_degree)
+            colors, _, info, mask = self.render(cam, t, sh_degree)
             visible_sum += int(mask.sum())
+            if self.relocator is not None:
+                info["means2d"].retain_grad()
 
             if cfg.img_loss == "l1":
                 imgloss = l1_loss(colors, pixels).mean()
@@ -232,12 +276,29 @@ class Runner:
                     colors.clamp(0, 1).permute(0, 3, 1, 2), pixels.permute(0, 3, 1, 2)
                 )
                 loss = loss + cfg.lambda_perc * lpipsloss
+            regloss = None
+            if cfg.lambda_reg > 0 and step < cfg.reg_until:
+                # Gl. 6: Basis-Opazität, gewichtet mit sg[σ(t)], gemittelt über alle N
+                temp = temporal_opacity(self.splats, t).detach()
+                regloss = (torch.sigmoid(self.splats["opacities"]) * temp).mean()
+                loss = loss + cfg.lambda_reg * regloss
             loss.backward()
+
+            if self.relocator is not None:
+                self.relocator.accumulate(info, mask)
 
             for opt in self.optimizers.values():
                 opt.step()
                 opt.zero_grad(set_to_none=True)
             scheduler.step()
+
+            if (
+                self.relocator is not None
+                and cfg.reloc_start <= step + 1 <= cfg.reloc_stop
+                and (step + 1) % cfg.reloc_every == 0
+            ):
+                n_reloc = self.relocator.step(self.splats, self.optimizers)
+                self.writer.add_scalar("gauss/relocated", n_reloc, step)
 
             if step % cfg.tb_every == 0:
                 pbar.set_description(f"loss={loss.item():.3f} sh={sh_degree} sichtbar={int(mask.sum())}")
@@ -245,12 +306,19 @@ class Runner:
                 w.add_scalar("train/loss", loss.item(), step)
                 w.add_scalar("train/imgloss", imgloss.item(), step)
                 w.add_scalar("train/ssimloss", ssimloss.item(), step)
+                if regloss is not None:
+                    w.add_scalar("train/regloss", regloss.item(), step)
+                if "velocities" in self.optimizers:
+                    w.add_scalar("train/velocities_lr", self.optimizers["velocities"].param_groups[0]["lr"], step)
                 w.add_scalar("train/visible_GS", int(mask.sum()), step)
                 w.add_scalar("train/mem_GB", torch.cuda.max_memory_allocated() / 1024**3, step)
                 with torch.no_grad():
                     s = torch.exp(self.splats["durations"])
                     w.add_scalar("gauss/duration_median", s.median().item(), step)
-                    w.add_scalar("gauss/opacity_mean", torch.sigmoid(self.splats["opacities"]).mean().item(), step)
+                    opa = torch.sigmoid(self.splats["opacities"])
+                    w.add_scalar("gauss/opacity_mean", opa.mean().item(), step)
+                    w.add_scalar("gauss/opacity_gt_0.9", (opa > 0.9).float().mean().item(), step)
+                    w.add_scalar("gauss/dead_frac", (opa <= cfg.reloc_min_opacity).float().mean().item(), step)
                     w.add_scalar("gauss/speed_median", self.splats["velocities"].norm(dim=-1).median().item(), step)
 
             if step + 1 in cfg.eval_steps or step + 1 == max_steps:

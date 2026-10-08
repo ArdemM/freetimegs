@@ -12,7 +12,7 @@ gsplat.rasterization übergeben wird. Gradienten auf μₜ, s und v laufen über
 PyTorch-Autograd, ein eigener CUDA-Kernel ist nicht nötig.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -22,16 +22,43 @@ from .data import GSPLAT_EXAMPLES  # noqa: F401  (setzt sys.path für utils)
 from utils import knn, rgb_to_sh  # gsplat/examples/utils.py
 
 
+def knn_velocities(
+    frames: List[Tuple[np.ndarray, np.ndarray, float]], k: int = 3
+) -> List[np.ndarray]:
+    """Geschwindigkeit pro Punkt aus k-NN-Zuordnung zum nächsten Keyframe (Abschnitt 3.2).
+
+    v = (Mittel der k nächsten Nachbarn im nächsten Keyframe − p) / Δt.
+    Der letzte Keyframe nimmt die Rückwärtsdifferenz zum vorherigen.
+    Rückgabe: eine Liste [M, 3] pro Keyframe (Weltkoordinaten pro Zeiteinheit).
+    """
+    from sklearn.neighbors import NearestNeighbors
+
+    if len(frames) < 2:
+        return [np.zeros_like(pts) for pts, _, _ in frames]
+    vels = []
+    for i, (pts, _, t) in enumerate(frames):
+        j = i + 1 if i + 1 < len(frames) else i - 1
+        other, _, t_other = frames[j]
+        nn = NearestNeighbors(n_neighbors=k).fit(other)
+        _, idx = nn.kneighbors(pts)
+        target = other[idx].mean(axis=1)  # [M, 3]
+        vels.append(((target - pts) / (t_other - t)).astype(np.float32))
+    return vels
+
+
 def init_from_frames(
     frames: List[Tuple[np.ndarray, np.ndarray, float]],
     init_duration: float,
     init_opacity: float = 0.1,
     init_scale: float = 1.0,
     sh_degree: int = 3,
+    velocities: Optional[List[np.ndarray]] = None,
 ) -> Dict[str, Tensor]:
-    """Gaußsche aus Punktwolken pro Frame, Zeit = Zeit des Frames, v = 0.
+    """Gaußsche aus Punktwolken pro Frame, Zeit = Zeit des Frames.
 
     frames: Liste von (Punkte [M, 3], Farben [M, 3] in [0, 1], normierte Zeit t).
+    velocities: optional eine Geschwindigkeit [M, 3] pro Frame (knn_velocities),
+    sonst v = 0.
     Die Skalierung kommt aus dem Abstand zu den 3 nächsten Nachbarn *innerhalb
     desselben Frames* (statische Bereiche wären sonst über alle Frames hinweg
     mehrfach vorhanden und die Abstände künstlich klein).
@@ -58,7 +85,12 @@ def init_from_frames(
         "shN": sh[:, 1:, :],
         "times": torch.cat(times),  # μₜ [N, 1]
         "durations": torch.full((N, 1), float(np.log(init_duration))),  # log s [N, 1]
-        "velocities": torch.zeros((N, 3)),  # v [N, 3], Weltkoordinaten pro Zeiteinheit
+        # v [N, 3], Weltkoordinaten pro Zeiteinheit
+        "velocities": (
+            torch.from_numpy(np.concatenate(velocities)).float()
+            if velocities is not None
+            else torch.zeros((N, 3))
+        ),
     }
 
 
