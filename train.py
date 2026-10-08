@@ -403,8 +403,16 @@ class Runner:
             f"PSNR {stats['psnr']:.2f} | SSIM {stats['ssim']:.4f} | LPIPS {stats['lpips']:.4f} "
             f"| {stats['render_fps']:.0f} FPS | {n} Bilder"
         )
+        # Aufschlüsselung pro Testkamera (Kameras in anderer Reihe prüfen neue Blickwinkel)
+        per_cam = {}
+        for name in sorted({r["cam"] for r in per_frame}):
+            rows = [r for r in per_frame if r["cam"] == name]
+            per_cam[name] = {k: float(np.mean([r[k] for r in rows])) for k in ["psnr", "ssim", "lpips"]}
+            if len(self.data.test_cams) > 1:
+                c = per_cam[name]
+                print(f"  {name}: PSNR {c['psnr']:.2f} | SSIM {c['ssim']:.4f} | LPIPS {c['lpips']:.4f}")
         with open(self.result_dir / "stats" / f"val_step{step:05d}.json", "w") as f:
-            json.dump({"mean": stats, "per_frame": per_frame}, f, indent=2)
+            json.dump({"mean": stats, "per_cam": per_cam, "per_frame": per_frame}, f, indent=2)
         for k in ["psnr", "ssim", "lpips", "render_fps"]:
             self.writer.add_scalar(f"val/{k}", stats[k], step)
         self.writer.flush()
