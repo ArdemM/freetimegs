@@ -40,7 +40,7 @@ from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from ftgs.data import MultiViewVideo
 from ftgs.model import gaussians_at, init_from_frames, knn_velocities, temporal_opacity
 from ftgs.relocation import Relocator
-from datasets.traj import generate_interpolated_path  # gsplat/examples
+from datasets.traj import focus_point_fn, viewmatrix  # gsplat/examples
 from gsplat.losses import l1_loss, ssim_loss
 from gsplat.rendering import rasterization
 from utils import set_random_seed  # gsplat/examples/utils.py
@@ -117,8 +117,11 @@ class Config:
 
     tb_every: int = 100
     lpips_net: Literal["vgg", "alex"] = "alex"
-    # Trajektorien-Video (Kamerafahrt durch die Trainingskameras, Zeit läuft mit)
+    # Trajektorien-Video (Kamerafahrt auf einem Bogen vor der Szene, Zeit läuft mit)
     render_traj: bool = True
+    traj_frames: int = 300  # 10 s bei 30 FPS
+    # Anteil der Kamera-Spannweite, den der Bogen abdeckt (< 1 bleibt im gut gesehenen Bereich)
+    traj_arc_scale: float = 0.8
     load_workers: int = 16
 
 
@@ -408,16 +411,42 @@ class Runner:
         return stats
 
     @torch.no_grad()
-    def render_traj(self, step: int, n_interp: int = 8) -> None:
-        """Kamerafahrt durch die Trainingskameras, die Zeit läuft dabei von 0 bis 1."""
+    def render_traj(self, step: int) -> None:
+        """Kamerafahrt auf einem Bogen um den Fokuspunkt, die Zeit läuft dabei von 0 bis 1.
+
+        Die Neural3DV-Kameras hängen in zwei Reihen übereinander. Eine Fahrt *durch*
+        die Kameras springt deshalb ständig zwischen den Reihen. Stattdessen schwenkt
+        die Kamera auf mittlerer Höhe sinusförmig hin und her (Start und Ende in der
+        Mitte, ohne Ruck) und blickt immer auf den Punkt, auf den alle Kameras zielen.
+        """
+        cfg = self.cfg
+        c2ws = self.data.camtoworlds[self.data.train_cams]
+        focus = focus_point_fn(c2ws)
+        # Kamera-y zeigt nach unten (OpenCV), die Welt-Oben-Richtung ist das Negative
+        up = -c2ws[:, :3, 1].mean(0)
+        up /= np.linalg.norm(up)
+        offset = c2ws[:, :3, 3].mean(0) - focus  # mittlere Kameraposition relativ zum Fokus
+
+        # Halbe Bogenweite aus der Verteilung der Kameras (Azimut um die Oben-Achse)
+        ref = offset - (offset @ up) * up
+        ref /= np.linalg.norm(ref)
+        side = np.cross(up, ref)
+        rel = c2ws[:, :3, 3] - focus
+        azimuths = np.arctan2(rel @ side, rel @ ref)
+        half = cfg.traj_arc_scale * 0.5 * (azimuths.max() - azimuths.min())
+        print(f"Kamerafahrt: Bogen ±{np.degrees(half):.1f}°, {cfg.traj_frames} Bilder")
+
+        n = cfg.traj_frames
+        angles = half * np.sin(2 * np.pi * np.arange(n) / n)
+        path = np.zeros((n, 4, 4), np.float32)
+        for i, a in enumerate(angles):
+            # Rodrigues-Drehung von offset um die Oben-Achse
+            o = offset * np.cos(a) + np.cross(up, offset) * np.sin(a) + up * (up @ offset) * (1 - np.cos(a))
+            pos = focus + o
+            path[i, :3] = viewmatrix(focus - pos, -up, pos)
+            path[i, 3, 3] = 1.0
+        times = np.linspace(0.0, 1.0, n)
         cams = self.data.train_cams
-        c2ws = self.data.camtoworlds[cams]
-        # Kameras entlang der Hauptachse (x nach Normalisierung) sortieren
-        order = np.argsort(c2ws[:, 0, 3])
-        path = generate_interpolated_path(c2ws[order][:, :3, :], n_interp)  # [P, 3, 4]
-        bottom = np.broadcast_to(np.array([0, 0, 0, 1], np.float32), (len(path), 1, 4))
-        path = np.concatenate([path, bottom], axis=1).astype(np.float32)
-        times = np.linspace(0.0, 1.0, len(path))
 
         writer = imageio.get_writer(self.result_dir / "videos" / f"traj_step{step}.mp4", fps=30, macro_block_size=2)
         for i in tqdm.trange(len(path), desc="Trajektorie"):
