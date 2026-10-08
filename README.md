@@ -6,7 +6,6 @@ gsplat bleibt unverändert als Bibliothek in `~/masterarbeit/gsplat`; eigener Co
 
 ## Hinweise zur Herkunft
 
-- **Inoffiziell und unabhängig.** Dieses Repository ist **nicht** der Code von FreeTimeGS und steht in keiner Verbindung zu dessen Autoren. Umgesetzt ist die im Paper beschriebene Methode: Y. Wang et al., *FreeTimeGS: Free Gaussian Primitives at Anytime and Anywhere for Dynamic Scene Reconstruction*, CVPR 2025 ([Projektseite](https://zju3dv.github.io/freetimegs/)). Offizieller Code ist nicht veröffentlicht. Ergebnisse dieses Repositorys sind keine Ergebnisse der Autoren.
 - **gsplat (Apache-2.0).** `train.py` ist an `gsplat/examples/simple_trainer.py` angelehnt, der Lizenzhinweis steht im Dateikopf. Datensatz-Parser und Rasterisierer werden unverändert aus gsplat importiert.
 - **FreeTimeGsVanilla (AGPL-3.0)** wurde nur als Referenz ausgeführt und gelesen (`scripts/run_vanilla_ref.sh`). Es wurde kein Code daraus übernommen.
 - **KI-Unterstützung.** Code und Dokumentation sind mit Unterstützung von KI entstanden (Claude Code, Anthropic). Commits mit KI-Beteiligung tragen die Zeile `Co-Authored-By: Claude`.
